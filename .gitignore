@@ -1,0 +1,8 @@
+# Build output: build.sh and test.sh recreate all of it
+build/
+
+# macOS
+.DS_Store
+
+# Python (Resources/make_icon.py)
+__pycache__/
