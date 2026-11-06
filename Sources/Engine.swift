@@ -71,7 +71,8 @@ enum SyncError: Error, Equatable {
     var message: String {
         switch self {
         case .notARepo:
-            return "This folder isn't a git repository. Clone the Overleaf project first, then add its folder."
+            return "This folder isn't a cloned manuscript (the top folder of a git repository). "
+                + "Clone the Overleaf project first, then add that folder."
         case .noRemote:
             return "This folder has no Overleaf remote to sync with."
         case .conflict(let files):
@@ -178,7 +179,11 @@ enum SyncEngine {
     }
 
     static func sync(_ repo: URL, now: Date = Date()) throws -> SyncOutcome {
-        guard repoRoot(repo) != nil else { throw SyncError.notARepo }
+        // Only a repo's top folder: a folder nested in some other repo must never commit and push that repo.
+        guard let top = repoRoot(repo),
+              top.resolvingSymlinksInPath().path == repo.resolvingSymlinksInPath().path else {
+            throw SyncError.notARepo
+        }
         guard Git.run(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], in: repo).ok else {
             throw SyncError.noRemote
         }

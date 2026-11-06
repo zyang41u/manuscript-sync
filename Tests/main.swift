@@ -52,6 +52,11 @@ let base = ["Weeds compete with crops.", "Line two.", "Line three.", "Line four.
 let root = URL(fileURLWithPath: CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : NSTemporaryDirectory())
     .appendingPathComponent("run-\(UUID().uuidString.prefix(8))")
 try! FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+// Inside a real repo, a "plain" test folder would sync that repo for real (commit and push).
+if Git.run(["rev-parse", "--git-dir"], in: root).ok {
+    print("Refusing to run: \(root.path) is inside a git repository. Pass a folder outside any repo.")
+    exit(1)
+}
 let remote = root.appendingPathComponent("overleaf.git")
 let me = root.appendingPathComponent("me")
 let boss = root.appendingPathComponent("boss")
@@ -187,6 +192,13 @@ print("errors")
 let plain = root.appendingPathComponent("plain")
 try! FileManager.default.createDirectory(at: plain, withIntermediateDirectories: true)
 expect(syncError(plain) == .notARepo, "plain folder is not a repo")
+let inner = me.appendingPathComponent("figs")
+try! FileManager.default.createDirectory(at: inner, withIntermediateDirectories: true)
+write(inner, "draft.tex", "not committed\n")
+let headBefore = git(me, "rev-parse", "HEAD").out
+expect(syncError(inner) == .notARepo, "folder inside a repo is refused, not synced as the whole repo")
+expect(git(me, "rev-parse", "HEAD").out == headBefore, "refused sync made no commit")
+try! FileManager.default.removeItem(at: inner)
 expect(SyncEngine.classify("fatal: Authentication failed for 'https://git.overleaf.com/abc/'") == .auth, "auth failure")
 expect(SyncEngine.classify("fatal: could not read Username for 'https://git.overleaf.com': terminal prompts disabled") == .auth, "missing token")
 expect(SyncEngine.classify("fatal: unable to access 'https://git.overleaf.com/abc/': The requested URL returned error: 403") == .auth, "403")
